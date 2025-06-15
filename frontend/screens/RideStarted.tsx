@@ -46,9 +46,10 @@ const RideStarted: React.FC = () => {
   const navigation = useNavigation<RideStartedNavigationProp>();
   const route = useRoute<RideStartedRouteProp>();
   const { rideId } = route.params || { rideId: '' };
-  
+
   const [rideStatus, setRideStatus] = useState<RideStatus | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [driverEta, setDriverEta] = useState<number | null>(null);
 
   useEffect(() => {
     // Load ride status
@@ -65,50 +66,40 @@ const RideStarted: React.FC = () => {
   const loadRideStatus = async () => {
     try {
       setIsLoading(true);
-      
-      // In a real app, this would fetch real data from a backend API
-      // For demo purposes, we'll create mock data
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const mockRideStatus: RideStatus = {
-        status: 'in_progress',
+
+      const [rideDetails, driverStatus] = await Promise.all([
+        RideService.getRideDetails(rideId),
+        RideService.getDriverStatus(rideId)
+      ]);
+
+      const passengers: Passenger[] = rideDetails.passengers.map((p: any) => ({
+        id: p.user_id,
+        name: p.user_id,
+        pickupLocation: p.pickup_location.address,
+        hasArrived: p.has_arrived,
+      }));
+
+      const rideInfo: RideStatus = {
+        status: driverStatus.status,
         driver: {
-          name: 'Ahmed Khan',
-          rating: 4.8,
-          carType: 'Premium',
+          name: 'Driver',
+          rating: 0,
+          carType: rideDetails.car_type,
         },
-        pickupTime: '09:30 AM',
-        dropoffTime: '10:15 AM',
-        currentLocation: 'G-8 Sector, Islamabad',
-        passengers: [
-          {
-            id: '1',
-            name: 'Sarah Ali',
-            pickupLocation: 'Blue Area, Islamabad',
-            hasArrived: true,
-          },
-          {
-            id: '2',
-            name: 'Muhammad Bilal',
-            pickupLocation: 'F-8 Markaz, Islamabad',
-            hasArrived: false,
-          },
-          {
-            id: '3',
-            name: 'Ayesha Tariq',
-            pickupLocation: 'G-9 Sector, Islamabad',
-            hasArrived: false,
-          },
-        ],
-        fare: 600,
-        distance: 15,
-        isDriver: false, // Set to true if the current user is the driver
+        pickupTime: rideDetails.created_at ? new Date(rideDetails.created_at).toLocaleTimeString() : '',
+        dropoffTime: '',
+        currentLocation: driverStatus.location?.address || 'Unknown',
+        passengers,
+        fare: rideDetails.fare,
+        distance: rideDetails.distance,
+        isDriver: false,
       };
-      
-      setRideStatus(mockRideStatus);
+
+      setRideStatus(rideInfo);
+      setDriverEta(driverStatus.eta_minutes);
     } catch (error) {
       console.error('Error loading ride status:', error);
-      Alert.alert('Error', 'Failed to load ride status. Please try again.');
+      Alert.alert('Error', 'Failed to load ride status.');
     } finally {
       setIsLoading(false);
     }
@@ -117,25 +108,10 @@ const RideStarted: React.FC = () => {
   const handleImHere = async () => {
     try {
       setIsLoading(true);
-      
-      // In a real app, this would notify the backend that the user has arrived
+
       await RideService.setArrivalStatus(rideId, true);
-      
-      // Update local state to reflect this change
-      if (rideStatus) {
-        const updatedPassengers = rideStatus.passengers.map(passenger => {
-          if (passenger.id === '2') { // Assume '2' is the current user's ID for demo
-            return { ...passenger, hasArrived: true };
-          }
-          return passenger;
-        });
-        
-        setRideStatus({
-          ...rideStatus,
-          passengers: updatedPassengers,
-        });
-      }
-      
+      await loadRideStatus();
+
       Alert.alert('Success', 'Your arrival has been confirmed!');
     } catch (error) {
       console.error('Error setting arrival status:', error);
@@ -154,25 +130,8 @@ const RideStarted: React.FC = () => {
     } as any);
   };
 
-  const handleEmergency = () => {
-    Alert.alert(
-      'Emergency',
-      'Do you want to report an emergency?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Report Emergency',
-          style: 'destructive',
-          onPress: () => {
-            // In a real app, this would trigger an emergency protocol
-            Alert.alert('Emergency Reported', 'Emergency contacts have been notified.');
-          },
-        },
-      ]
-    );
+const handleEmergency = () => {
+    navigation.navigate('Report');
   };
 
   const handleEndRide = () => {
@@ -193,11 +152,7 @@ const RideStarted: React.FC = () => {
               // In a real app, this would update the ride status on the backend
               await RideService.updateRideStatus(rideId, 'completed');
               
-              // Navigate back to homepage
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Homepage' as never }],
-              });
+              navigation.replace('RideDetails', { rideId });
             } catch (error) {
               console.error('Error ending ride:', error);
               Alert.alert('Error', 'Failed to end ride. Please try again.');
@@ -280,6 +235,20 @@ const RideStarted: React.FC = () => {
               <View style={styles.rideDetailTextContainer}>
                 <Text style={styles.rideDetailLabel}>Pickup Time</Text>
                 <Text style={styles.rideDetailValue}>{rideStatus.pickupTime}</Text>
+              </View>
+            </View>
+
+            <View style={styles.rideDetailRow}>
+              <View style={styles.rideDetailIconContainer}>
+                <Image
+                  source={require('../assets/images/Blue time Icon.png')}
+                  style={styles.rideDetailIcon}
+                  resizeMode="contain"
+                />
+              </View>
+              <View style={styles.rideDetailTextContainer}>
+                <Text style={styles.rideDetailLabel}>Driver ETA</Text>
+                <Text style={styles.rideDetailValue}>{driverEta !== null ? `${driverEta} min` : 'N/A'}</Text>
               </View>
             </View>
 

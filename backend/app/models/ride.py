@@ -2,6 +2,7 @@
 from .. import mongo
 from bson.objectid import ObjectId
 from datetime import datetime
+from ..utils.geo_utils import GeoUtils
 
 class Ride:
     @staticmethod
@@ -138,3 +139,48 @@ class Ride:
         """Check if a specific user is a passenger on a ride"""
         passenger = mongo.db.ride_passengers.find_one({'ride_id': ride_id, 'user_id': user_id})
         return passenger
+
+    @staticmethod
+    def update_driver_location(ride_id, location):
+        """Update the driver's current location for an active ride"""
+        mongo.db.available_rides.update_one(
+            {'ride_id': ride_id},
+            {
+                '$set': {
+                    'location': location,
+                    'location_updated_at': datetime.utcnow()
+                }
+            }
+        )
+        return True
+
+    @staticmethod
+    def get_driver_status(ride_id):
+        """Get driver's current location and ETA"""
+        ride = mongo.db.rides.find_one({'_id': ObjectId(ride_id)})
+        if not ride:
+            return None
+
+        available = mongo.db.available_rides.find_one({'ride_id': ride_id})
+        if available and available.get('location'):
+            location = available['location']
+        else:
+            location = ride.get('pickup_location')
+
+        dropoff = ride.get('dropoff_location', {})
+        eta_minutes = None
+        if location and dropoff:
+            try:
+                distance = GeoUtils.calculate_distance(
+                    location.get('coordinates'),
+                    dropoff.get('coordinates')
+                )
+                eta_minutes = int((distance / 40) * 60)
+            except Exception:
+                eta_minutes = None
+
+        return {
+            'status': ride.get('status'),
+            'location': location,
+            'eta_minutes': eta_minutes
+        }

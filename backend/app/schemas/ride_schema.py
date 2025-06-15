@@ -33,6 +33,11 @@ class ArrivalStatusSchema(Schema):
     ride_id = fields.Str(required=True)
     has_arrived = fields.Bool(missing=True)
 
+class DriverLocationSchema(Schema):
+    """Schema for updating driver location"""
+    ride_id = fields.Str(required=True)
+    location = fields.Nested(LocationSchema, required=True)
+
 class RideStatusSchema(Schema):
     """Schema for updating ride status"""
     ride_id = fields.Str(required=True)
