@@ -106,6 +106,7 @@ class RideController:
             pickup_location = validated_data.get('pickup_location')
             group_join = validated_data.get('group_join', False)
             seat_count = int(validated_data.get('seat_count', 1))
+            is_group_leader = validated_data.get('is_group_leader', False)
             
             # Check if ride exists
             ride = Ride.get_by_id(ride_id)
@@ -123,7 +124,7 @@ class RideController:
                 return jsonify({'error': 'Not enough seats available'}), 400
             
             # Add the passenger to the ride
-            passenger_id = Ride.join_ride(ride_id, user_id, pickup_location, group_join, seat_count)
+            passenger_id = Ride.join_ride(ride_id, user_id, pickup_location, group_join, seat_count, is_group_leader)
             
             return jsonify({
                 'message': 'Ride joined successfully',

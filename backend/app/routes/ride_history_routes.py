@@ -19,3 +19,18 @@ def get_ride_details(ride_id):
 @jwt_required()
 def rate_ride(ride_id):
     return RideHistoryController.rate_ride(ride_id)
+
+@ride_history_bp.route('/<ride_id>/receipt', methods=['GET'])
+@jwt_required()
+def get_receipt(ride_id):
+    return RideHistoryController.get_ride_receipt(ride_id)
+
+@ride_history_bp.route('/<ride_id>/reuse', methods=['POST'])
+@jwt_required()
+def reuse_ride(ride_id):
+    return RideHistoryController.reuse_ride(ride_id)
+
+@ride_history_bp.route('/history/statistics', methods=['GET'])
+@jwt_required()
+def ride_statistics():
+    return RideHistoryController.get_statistics()

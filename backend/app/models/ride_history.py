@@ -199,3 +199,78 @@ class RideHistory:
             mongo.db.rides.delete_one({'_id': ObjectId(ride_id)})
         
         return True
+
+    @staticmethod
+    def get_ride_receipt(ride_id, user_id=None):
+        """Return a ride receipt with passenger fare share"""
+        ride = RideHistory.get_ride_details(ride_id, user_id)
+        if not ride:
+            return None
+        passengers = list(mongo.db.ride_passengers.find({'ride_id': ride_id}))
+        ride['passengers'] = []
+        total_seats = 0
+        for p in passengers:
+            seat_count = p.get('seat_count', 1)
+            ride['passengers'].append({
+                'user_id': p.get('user_id'),
+                'seat_count': seat_count
+            })
+            total_seats += seat_count
+        if total_seats <= 0:
+            total_seats = 1
+        for p in ride['passengers']:
+            share = round(ride['fare'] * p['seat_count'] / total_seats, 2)
+            p['fare_share'] = share
+        return ride
+
+    @staticmethod
+    def reuse_ride(ride_id, user_id):
+        """Create a new ride from a past ride"""
+        if not ObjectId.is_valid(ride_id):
+            return None
+        old = mongo.db.ride_history.find_one({'_id': ObjectId(ride_id)})
+        if not old:
+            return None
+        data = {
+            'creator_user_id': user_id,
+            'pickup_location': old.get('pickup_location'),
+            'dropoff_location': old.get('dropoff_location'),
+            'car_type': old.get('car_type'),
+            'passenger_slots': old.get('passenger_slots', 1),
+            'payment_method': old.get('payment_method'),
+            'promo_code': '',
+            'group_join': False,
+            'fare': old.get('fare', 0),
+            'distance': old.get('distance', 0),
+            'sector': old.get('sector', ''),
+            'match_social': False,
+            'time_to_reach': old.get('time_to_reach', '')
+        }
+        from .ride import Ride
+        return Ride.create(data)
+
+    @staticmethod
+    def get_statistics(user_id):
+        """Return ride statistics for a user"""
+        query = {'$or': [
+            {'creator_user_id': user_id},
+            {'user_id': user_id}
+        ]}
+        active = list(mongo.db.rides.find(query))
+        past = list(mongo.db.ride_history.find(query))
+        all_rides = active + past
+        total_rides = len(all_rides)
+        completed = [r for r in past]
+        total_distance = sum(r.get('distance', 0) for r in all_rides)
+        total_spent = sum(r.get('fare', 0) for r in completed)
+        avg_fare = total_spent / len(completed) if completed else 0
+        ratings = [r.get('user_rating') for r in past if r.get('user_rating')]
+        avg_rating = sum(ratings) / len(ratings) if ratings else 0
+        return {
+            'total_rides': total_rides,
+            'completed_rides': len(completed),
+            'total_distance': total_distance,
+            'total_spent': total_spent,
+            'average_fare': avg_fare,
+            'average_rating': avg_rating
+        }

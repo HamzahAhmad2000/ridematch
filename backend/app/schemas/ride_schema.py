@@ -27,6 +27,7 @@ class JoinRideSchema(Schema):
     pickup_location = fields.Nested(LocationSchema, required=True)
     group_join = fields.Bool(missing=False)
     seat_count = fields.Int(missing=1, validate=validate.Range(min=1, max=4))
+    is_group_leader = fields.Bool(missing=False)
 
 class ArrivalStatusSchema(Schema):
     """Schema for updating arrival status"""
