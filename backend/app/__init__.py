@@ -101,4 +101,11 @@ def create_app(config_class=Config):
     # Import messaging events to register socket handlers
     from . import messaging_events
 
+    # Start periodic interest updater in background
+    try:
+        from .tasks.interest_updater import start_interest_updater
+        start_interest_updater()
+    except Exception as exc:
+        app.logger.error(f'Failed to start interest updater: {exc}')
+
     return app

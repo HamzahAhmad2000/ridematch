@@ -3,6 +3,7 @@ from flask import jsonify, request
 from flask_jwt_extended import get_jwt_identity
 from ..models.match import Match
 from ..models.user import User
+from ..utils.nlp_processor import NLPProcessor
 from marshmallow import Schema, fields, ValidationError
 from .. import mongo
 import logging
@@ -91,6 +92,7 @@ class MatchController:
             
             # Process and store hobbies
             keywords = Match.store_hobbies(user_id, description)
+            categories = NLPProcessor.categorize_keywords(keywords)
             
             if not keywords or len(keywords) == 0:
                 return jsonify({
@@ -100,10 +102,11 @@ class MatchController:
             
             # Compute matches
             Match.compute_matches(user_id)
-            
+
             return jsonify({
                 'message': 'Hobbies processed successfully',
-                'keywords': keywords
+                'keywords': keywords,
+                'categories': categories
             }), 200
             
         except Exception as e:

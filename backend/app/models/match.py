@@ -10,9 +10,11 @@ class Match:
         """Extract keywords from user's description and store as hobbies"""
         # Extract keywords using NLP
         keywords = NLPProcessor.extract_keywords(description)
-        
+        categories = NLPProcessor.categorize_keywords(keywords)
+
         # Store as CSV
         keywords_csv = ','.join(keywords)
+        categories_csv = ','.join(categories)
         
         # Check if entry already exists
         existing = mongo.db.user_hobbies.find_one({'user_id': user_id})
@@ -25,6 +27,8 @@ class Match:
                         'raw_description': description,
                         'extracted_keywords': keywords,
                         'extracted_csv': keywords_csv,
+                        'categories': categories,
+                        'categories_csv': categories_csv,
                         'updated_at': datetime.utcnow()
                     }
                 }
@@ -35,6 +39,8 @@ class Match:
                 'raw_description': description,
                 'extracted_keywords': keywords,
                 'extracted_csv': keywords_csv,
+                'categories': categories,
+                'categories_csv': categories_csv,
                 'created_at': datetime.utcnow()
             })
         
@@ -109,8 +115,43 @@ class Match:
     def get_best_matches(user_id):
         """Get the precomputed best matches for a user"""
         user_matches = mongo.db.user_best_matches.find_one({'user_id': user_id})
-        
+
         if not user_matches:
             return []
-        
+
         return user_matches.get('matches', [])
+
+    @staticmethod
+    def update_all_user_hobbies():
+        """Reprocess stored hobby descriptions for all users"""
+        all_hobbies = list(mongo.db.user_hobbies.find())
+
+        for entry in all_hobbies:
+            user_id = entry.get('user_id')
+            description = entry.get('raw_description', '')
+            if not user_id or not description:
+                continue
+
+            # Re-extract keywords and categories
+            keywords = NLPProcessor.extract_keywords(description)
+            categories = NLPProcessor.categorize_keywords(keywords)
+
+            keywords_csv = ','.join(keywords)
+            categories_csv = ','.join(categories)
+
+            mongo.db.user_hobbies.update_one(
+                {'user_id': user_id},
+                {
+                    '$set': {
+                        'extracted_keywords': keywords,
+                        'extracted_csv': keywords_csv,
+                        'categories': categories,
+                        'categories_csv': categories_csv,
+                        'updated_at': datetime.utcnow()
+                    }
+                }
+            )
+
+            # Recompute matches for the user
+            Match.compute_matches(user_id)
+
