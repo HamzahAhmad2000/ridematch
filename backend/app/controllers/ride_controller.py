@@ -160,18 +160,64 @@ class RideController:
         return jsonify({
             'message': 'Ride status updated successfully'
         }), 200
+
+    @staticmethod
+    def complete_ride():
+        data = request.get_json()
+        ride_id = data.get('ride_id')
+        if not ride_id:
+            return jsonify({'error': 'ride_id required'}), 400
+
+        success = Ride.complete_ride(ride_id)
+        if not success:
+            return jsonify({'error': 'Ride not found'}), 404
+
+        return jsonify({'message': 'Ride completed successfully'}), 200
+
+    @staticmethod
+    def get_ride_route(ride_id):
+        try:
+            lat = float(request.args.get('lat'))
+            lng = float(request.args.get('lng'))
+        except (TypeError, ValueError):
+            return jsonify({'error': 'lat and lng query params required'}), 400
+
+        route = Ride.get_route_order(ride_id, {'latitude': lat, 'longitude': lng})
+
+        formatted_route = []
+        for p in route:
+            user = User.get_by_id(p.get('user_id'))
+            formatted_route.append({
+                'user_id': p.get('user_id'),
+                'name': user.get('name') if user else 'Unknown',
+                'pickup_location': p.get('pickup_location'),
+                'has_arrived': p.get('has_arrived', False)
+            })
+
+        return jsonify(formatted_route), 200
     
     @staticmethod
     def get_ride_details(ride_id):
         ride = Ride.get_by_id(ride_id)
-        
+
         if not ride:
             return jsonify({'error': 'Ride not found'}), 404
-        
-        # Get passengers
+
+        user_id = get_jwt_identity()
+
         passengers = Ride.get_ride_passengers(ride_id)
-        
-        # Format response
+
+        passenger_list = []
+        for p in passengers:
+            user = User.get_by_id(p.get('user_id'))
+            passenger_list.append({
+                'user_id': p.get('user_id'),
+                'name': user.get('name') if user else 'Unknown',
+                'pickup_location': p.get('pickup_location'),
+                'status': p.get('status'),
+                'has_arrived': p.get('has_arrived')
+            })
+
         ride_data = {
             'ride_id': str(ride.get('_id')),
             'pickup_location': ride.get('pickup_location'),
@@ -182,14 +228,8 @@ class RideController:
             'distance': ride.get('distance'),
             'status': ride.get('status'),
             'created_at': ride.get('created_at').isoformat() if ride.get('created_at') else None,
-            'passengers': [
-                {
-                    'user_id': p.get('user_id'),
-                    'pickup_location': p.get('pickup_location'),
-                    'status': p.get('status'),
-                    'has_arrived': p.get('has_arrived')
-                } for p in passengers
-            ]
+            'passengers': passenger_list,
+            'is_driver': ride.get('creator_user_id') == user_id
         }
-        
+
         return jsonify(ride_data), 200

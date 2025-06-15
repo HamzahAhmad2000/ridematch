@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Linking,
 } from 'react-native';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -20,26 +21,34 @@ type RideStartedRouteProp = RouteProp<RootStackParamList, 'RideStarted'>;
 type RideStartedNavigationProp = StackNavigationProp<RootStackParamList, 'RideStarted'>;
 
 interface Passenger {
-  id: string;
+  user_id: string;
   name: string;
-  pickupLocation: string;
-  hasArrived: boolean;
+  pickup_location: {
+    address: string;
+    coordinates: {
+      latitude: number;
+      longitude: number;
+    };
+  };
+  has_arrived: boolean;
 }
 
 interface RideStatus {
-  status: 'preparing' | 'picking_up' | 'in_progress' | 'completed';
+  status: string;
   driver: {
     name: string;
-    rating: number;
-    carType: string;
+    rating?: number;
+    carType?: string;
   };
-  pickupTime: string;
-  dropoffTime: string;
-  currentLocation: string;
   passengers: Passenger[];
   fare: number;
   distance: number;
-  isDriver: boolean;
+  is_driver: boolean;
+  pickup_location: {
+    address: string;
+    coordinates?: { latitude: number; longitude: number };
+  };
+  dropoff_location: { address: string };
 }
 
 const RideStarted: React.FC = () => {
@@ -48,6 +57,7 @@ const RideStarted: React.FC = () => {
   const { rideId } = route.params || { rideId: '' };
   
   const [rideStatus, setRideStatus] = useState<RideStatus | null>(null);
+  const [routeOrder, setRouteOrder] = useState<Passenger[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   useEffect(() => {
@@ -65,47 +75,22 @@ const RideStarted: React.FC = () => {
   const loadRideStatus = async () => {
     try {
       setIsLoading(true);
-      
-      // In a real app, this would fetch real data from a backend API
-      // For demo purposes, we'll create mock data
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      const mockRideStatus: RideStatus = {
-        status: 'in_progress',
-        driver: {
-          name: 'Ahmed Khan',
-          rating: 4.8,
-          carType: 'Premium',
-        },
-        pickupTime: '09:30 AM',
-        dropoffTime: '10:15 AM',
-        currentLocation: 'G-8 Sector, Islamabad',
-        passengers: [
-          {
-            id: '1',
-            name: 'Sarah Ali',
-            pickupLocation: 'Blue Area, Islamabad',
-            hasArrived: true,
-          },
-          {
-            id: '2',
-            name: 'Muhammad Bilal',
-            pickupLocation: 'F-8 Markaz, Islamabad',
-            hasArrived: false,
-          },
-          {
-            id: '3',
-            name: 'Ayesha Tariq',
-            pickupLocation: 'G-9 Sector, Islamabad',
-            hasArrived: false,
-          },
-        ],
-        fare: 600,
-        distance: 15,
-        isDriver: false, // Set to true if the current user is the driver
-      };
-      
-      setRideStatus(mockRideStatus);
+      const details = await RideService.getRideDetails(rideId);
+      setRideStatus(details);
+
+      if (details.is_driver) {
+        try {
+          const route = await RideService.getRideRoute(rideId, {
+            latitude: details.pickup_location.coordinates?.latitude || 0,
+            longitude: details.pickup_location.coordinates?.longitude || 0,
+          });
+          setRouteOrder(route);
+        } catch (err) {
+          console.log('Failed to load route', err);
+        }
+      } else {
+        setRouteOrder(details.passengers);
+      }
     } catch (error) {
       console.error('Error loading ride status:', error);
       Alert.alert('Error', 'Failed to load ride status. Please try again.');
@@ -117,25 +102,9 @@ const RideStarted: React.FC = () => {
   const handleImHere = async () => {
     try {
       setIsLoading(true);
-      
-      // In a real app, this would notify the backend that the user has arrived
       await RideService.setArrivalStatus(rideId, true);
-      
-      // Update local state to reflect this change
-      if (rideStatus) {
-        const updatedPassengers = rideStatus.passengers.map(passenger => {
-          if (passenger.id === '2') { // Assume '2' is the current user's ID for demo
-            return { ...passenger, hasArrived: true };
-          }
-          return passenger;
-        });
-        
-        setRideStatus({
-          ...rideStatus,
-          passengers: updatedPassengers,
-        });
-      }
-      
+      await loadRideStatus();
+
       Alert.alert('Success', 'Your arrival has been confirmed!');
     } catch (error) {
       console.error('Error setting arrival status:', error);
@@ -190,8 +159,7 @@ const RideStarted: React.FC = () => {
             try {
               setIsLoading(true);
               
-              // In a real app, this would update the ride status on the backend
-              await RideService.updateRideStatus(rideId, 'completed');
+              await RideService.completeRide(rideId);
               
               // Navigate back to homepage
               navigation.reset({
@@ -269,47 +237,34 @@ const RideStarted: React.FC = () => {
           </View>
 
           <View style={styles.rideDetailsCard}>
-            <View style={styles.rideDetailRow}>
-              <View style={styles.rideDetailIconContainer}>
-                <Image
-                  source={require('../assets/images/Blue time Icon.png')}
-                  style={styles.rideDetailIcon}
-                  resizeMode="contain"
-                />
-              </View>
-              <View style={styles.rideDetailTextContainer}>
-                <Text style={styles.rideDetailLabel}>Pickup Time</Text>
-                <Text style={styles.rideDetailValue}>{rideStatus.pickupTime}</Text>
-              </View>
+          <View style={styles.rideDetailRow}>
+            <View style={styles.rideDetailIconContainer}>
+              <Image
+                source={require('../assets/images/Location Icon.png')}
+                style={styles.rideDetailIcon}
+                resizeMode="contain"
+              />
             </View>
+            <View style={styles.rideDetailTextContainer}>
+              <Text style={styles.rideDetailLabel}>From</Text>
+              <Text style={styles.rideDetailValue}>{rideStatus.pickup_location.address}</Text>
+            </View>
+          </View>
 
-            <View style={styles.rideDetailRow}>
-              <View style={styles.rideDetailIconContainer}>
-                <Image
-                  source={require('../assets/images/Blue time Icon.png')}
-                  style={styles.rideDetailIcon}
-                  resizeMode="contain"
-                />
-              </View>
-              <View style={styles.rideDetailTextContainer}>
-                <Text style={styles.rideDetailLabel}>Dropoff Time (Est.)</Text>
-                <Text style={styles.rideDetailValue}>{rideStatus.dropoffTime}</Text>
-              </View>
+          <View style={styles.rideDetailRow}>
+            <View style={styles.rideDetailIconContainer}>
+              <Image
+                source={require('../assets/images/Location Icon.png')}
+                style={styles.rideDetailIcon}
+                resizeMode="contain"
+              />
             </View>
+            <View style={styles.rideDetailTextContainer}>
+              <Text style={styles.rideDetailLabel}>To</Text>
+              <Text style={styles.rideDetailValue}>{rideStatus.dropoff_location.address}</Text>
+            </View>
+          </View>
 
-            <View style={styles.rideDetailRow}>
-              <View style={styles.rideDetailIconContainer}>
-                <Image
-                  source={require('../assets/images/Location Icon.png')}
-                  style={styles.rideDetailIcon}
-                  resizeMode="contain"
-                />
-              </View>
-              <View style={styles.rideDetailTextContainer}>
-                <Text style={styles.rideDetailLabel}>Current Location</Text>
-                <Text style={styles.rideDetailValue}>{rideStatus.currentLocation}</Text>
-              </View>
-            </View>
 
             <View style={styles.rideDetailRow}>
               <View style={styles.rideDetailIconContainer}>
@@ -344,8 +299,8 @@ const RideStarted: React.FC = () => {
         {/* Passengers Section */}
         <View style={styles.passengersSection}>
           <Text style={styles.sectionTitle}>Passengers</Text>
-          {rideStatus.passengers.map((passenger) => (
-            <View key={passenger.id} style={styles.passengerCard}>
+          {routeOrder.map((passenger) => (
+            <View key={passenger.user_id} style={styles.passengerCard}>
               <View style={styles.passengerInfo}>
                 <View style={styles.passengerImageContainer}>
                   <Image
@@ -356,16 +311,23 @@ const RideStarted: React.FC = () => {
                 </View>
                 <View style={styles.passengerDetails}>
                   <Text style={styles.passengerName}>{passenger.name}</Text>
-                  <Text style={styles.passengerLocation}>{passenger.pickupLocation}</Text>
+                  <Text style={styles.passengerLocation}>{passenger.pickup_location.address}</Text>
                 </View>
               </View>
               <View style={styles.passengerStatus}>
                 <Text style={[
                   styles.passengerStatusText,
-                  passenger.hasArrived ? styles.arrivedText : styles.pendingText
+                  passenger.has_arrived ? styles.arrivedText : styles.pendingText
                 ]}>
-                  {passenger.hasArrived ? 'Arrived' : 'Pending'}
+                  {passenger.has_arrived ? 'Arrived' : 'Pending'}
                 </Text>
+                {rideStatus.is_driver && (
+                  <TouchableOpacity
+                    onPress={() => Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(passenger.pickup_location.address)}`)}
+                  >
+                    <Text style={styles.navigateText}>Navigate</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           ))}
@@ -373,7 +335,7 @@ const RideStarted: React.FC = () => {
 
         {/* Action Buttons */}
         <View style={styles.actionButtons}>
-          {!rideStatus.isDriver && (
+          {!rideStatus.is_driver && (
             <TouchableOpacity
               style={styles.imHereButton}
               onPress={handleImHere}
@@ -389,7 +351,7 @@ const RideStarted: React.FC = () => {
             disabled={isLoading}
           >
             <Text style={styles.contactButtonText}>
-              {rideStatus.isDriver ? 'Contact Passengers' : 'Contact Driver'}
+              {rideStatus.is_driver ? 'Contact Passengers' : 'Contact Driver'}
             </Text>
           </TouchableOpacity>
 
@@ -401,7 +363,7 @@ const RideStarted: React.FC = () => {
             <Text style={styles.emergencyButtonText}>Emergency</Text>
           </TouchableOpacity>
 
-          {rideStatus.isDriver && (
+          {rideStatus.is_driver && (
             <TouchableOpacity
               style={styles.endRideButton}
               onPress={handleEndRide}
@@ -689,6 +651,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#ffffff',
+  },
+  navigateText: {
+    fontFamily: 'Inter',
+    fontSize: 12,
+    color: '#ff9020',
+    marginTop: 4,
   },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
