@@ -30,6 +30,10 @@ def set_arrival_status():
 def update_ride_status():
     return RideController.update_ride_status()
 
+@ride_bp.route('/location', methods=['POST'])
+@jwt_required()
+def update_driver_location():
+    return RideController.update_driver_location()
 @ride_bp.route('/complete', methods=['POST'])
 @jwt_required()
 def complete_ride():
@@ -44,3 +48,8 @@ def get_ride_route(ride_id):
 @jwt_required()
 def get_ride_details(ride_id):
     return RideController.get_ride_details(ride_id)
+
+@ride_bp.route('/<ride_id>/driver-status', methods=['GET'])
+@jwt_required()
+def get_driver_status(ride_id):
+    return RideController.get_driver_status(ride_id)

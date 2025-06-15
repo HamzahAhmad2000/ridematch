@@ -232,4 +232,29 @@ class RideController:
             'is_driver': ride.get('creator_user_id') == user_id
         }
 
+        
         return jsonify(ride_data), 200
+
+    @staticmethod
+    def update_driver_location():
+        data = request.get_json()
+        schema = DriverLocationSchema()
+        try:
+            validated = schema.load(data)
+        except ValidationError as err:
+            return jsonify({'error': 'Validation error', 'details': err.messages}), 400
+
+        ride_id = validated.get('ride_id')
+        location = validated.get('location')
+
+        Ride.update_driver_location(ride_id, location)
+        return jsonify({'message': 'Location updated'}), 200
+
+    @staticmethod
+    def get_driver_status(ride_id):
+        status = Ride.get_driver_status(ride_id)
+        if not status:
+            return jsonify({'error': 'Ride not found'}), 404
+        return jsonify(status), 200
+
+

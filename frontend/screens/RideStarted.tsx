@@ -55,10 +55,11 @@ const RideStarted: React.FC = () => {
   const navigation = useNavigation<RideStartedNavigationProp>();
   const route = useRoute<RideStartedRouteProp>();
   const { rideId } = route.params || { rideId: '' };
-  
+
   const [rideStatus, setRideStatus] = useState<RideStatus | null>(null);
   const [routeOrder, setRouteOrder] = useState<Passenger[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [driverEta, setDriverEta] = useState<number | null>(null);
 
   useEffect(() => {
     // Load ride status
@@ -75,6 +76,37 @@ const RideStarted: React.FC = () => {
   const loadRideStatus = async () => {
     try {
       setIsLoading(true);
+
+      const [rideDetails, driverStatus] = await Promise.all([
+        RideService.getRideDetails(rideId),
+        RideService.getDriverStatus(rideId)
+      ]);
+
+      const passengers: Passenger[] = rideDetails.passengers.map((p: any) => ({
+        id: p.user_id,
+        name: p.user_id,
+        pickupLocation: p.pickup_location.address,
+        hasArrived: p.has_arrived,
+      }));
+
+      const rideInfo: RideStatus = {
+        status: driverStatus.status,
+        driver: {
+          name: 'Driver',
+          rating: 0,
+          carType: rideDetails.car_type,
+        },
+        pickupTime: rideDetails.created_at ? new Date(rideDetails.created_at).toLocaleTimeString() : '',
+        dropoffTime: '',
+        currentLocation: driverStatus.location?.address || 'Unknown',
+        passengers,
+        fare: rideDetails.fare,
+        distance: rideDetails.distance,
+        isDriver: false,
+      };
+
+      setRideStatus(rideInfo);
+      setDriverEta(driverStatus.eta_minutes);
       const details = await RideService.getRideDetails(rideId);
       setRideStatus(details);
 
@@ -93,7 +125,7 @@ const RideStarted: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading ride status:', error);
-      Alert.alert('Error', 'Failed to load ride status. Please try again.');
+      Alert.alert('Error', 'Failed to load ride status.');
     } finally {
       setIsLoading(false);
     }
@@ -102,6 +134,7 @@ const RideStarted: React.FC = () => {
   const handleImHere = async () => {
     try {
       setIsLoading(true);
+
       await RideService.setArrivalStatus(rideId, true);
       await loadRideStatus();
 
@@ -123,25 +156,8 @@ const RideStarted: React.FC = () => {
     } as any);
   };
 
-  const handleEmergency = () => {
-    Alert.alert(
-      'Emergency',
-      'Do you want to report an emergency?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Report Emergency',
-          style: 'destructive',
-          onPress: () => {
-            // In a real app, this would trigger an emergency protocol
-            Alert.alert('Emergency Reported', 'Emergency contacts have been notified.');
-          },
-        },
-      ]
-    );
+const handleEmergency = () => {
+    navigation.navigate('Report');
   };
 
   const handleEndRide = () => {
@@ -161,11 +177,7 @@ const RideStarted: React.FC = () => {
               
               await RideService.completeRide(rideId);
               
-              // Navigate back to homepage
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Homepage' as never }],
-              });
+              navigation.replace('RideDetails', { rideId });
             } catch (error) {
               console.error('Error ending ride:', error);
               Alert.alert('Error', 'Failed to end ride. Please try again.');
@@ -245,6 +257,33 @@ const RideStarted: React.FC = () => {
                 resizeMode="contain"
               />
             </View>
+
+            <View style={styles.rideDetailRow}>
+              <View style={styles.rideDetailIconContainer}>
+                <Image
+                  source={require('../assets/images/Blue time Icon.png')}
+                  style={styles.rideDetailIcon}
+                  resizeMode="contain"
+                />
+              </View>
+              <View style={styles.rideDetailTextContainer}>
+                <Text style={styles.rideDetailLabel}>Driver ETA</Text>
+                <Text style={styles.rideDetailValue}>{driverEta !== null ? `${driverEta} min` : 'N/A'}</Text>
+              </View>
+            </View>
+
+            <View style={styles.rideDetailRow}>
+              <View style={styles.rideDetailIconContainer}>
+                <Image
+                  source={require('../assets/images/Blue time Icon.png')}
+                  style={styles.rideDetailIcon}
+                  resizeMode="contain"
+                />
+              </View>
+              <View style={styles.rideDetailTextContainer}>
+                <Text style={styles.rideDetailLabel}>Dropoff Time (Est.)</Text>
+                <Text style={styles.rideDetailValue}>{rideStatus.dropoffTime}</Text>
+              </View>
             <View style={styles.rideDetailTextContainer}>
               <Text style={styles.rideDetailLabel}>From</Text>
               <Text style={styles.rideDetailValue}>{rideStatus.pickup_location.address}</Text>
