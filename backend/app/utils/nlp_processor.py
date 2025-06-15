@@ -79,3 +79,14 @@ class NLPProcessor:
         unique_keywords = list(dict.fromkeys(enhanced_keywords))
         
         return unique_keywords
+
+    @staticmethod
+    def categorize_keywords(keywords):
+        """Return a list of hobby categories that match the given keywords"""
+        categories = []
+        for category, related_terms in NLPProcessor.HOBBY_CATEGORIES.items():
+            if any(keyword in related_terms for keyword in keywords):
+                categories.append(category)
+
+        # Remove duplicates while preserving order
+        return list(dict.fromkeys(categories))
