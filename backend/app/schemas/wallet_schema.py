@@ -18,3 +18,8 @@ class PaymentSchema(Schema):
     """Schema for ride payment"""
     ride_id = fields.Str(required=True)
     amount = fields.Float(required=True, validate=validate.Range(min=1))
+
+class TransferSchema(Schema):
+    """Schema for wallet balance transfer"""
+    to_user_id = fields.Str(required=True)
+    amount = fields.Float(required=True, validate=validate.Range(min=1))

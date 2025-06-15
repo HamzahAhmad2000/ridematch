@@ -19,3 +19,13 @@ def top_up_wallet():
 @jwt_required()
 def pay_for_ride():
     return WalletController.pay_for_ride()
+
+@wallet_bp.route('/transfer', methods=['POST'])
+@jwt_required()
+def transfer_balance():
+    return WalletController.transfer_balance()
+
+@wallet_bp.route('/statement', methods=['GET'])
+@jwt_required()
+def get_statement():
+    return WalletController.get_statement()
