@@ -5,7 +5,7 @@ export interface Transaction {
   id: string;
   user_id: string;
   amount: number;
-  type: 'topup' | 'payment' | 'refund';
+  type: 'topup' | 'payment' | 'refund' | 'transfer';
   description: string;
   payment_method?: string;
   ride_id?: string;
@@ -40,6 +40,16 @@ export interface WalletResponse {
   transaction_id?: string;
 }
 
+export interface TransferRequest {
+  to_user_id: string;
+  amount: number;
+}
+
+export interface StatementResponse {
+  transactions: Transaction[];
+  low_balance: boolean;
+}
+
 export const WalletService = {
   async getWalletInfo(): Promise<WalletInfo> {
     try {
@@ -67,6 +77,26 @@ export const WalletService = {
       return response.data;
     } catch (error) {
       console.error('Error paying for ride:', error);
+      throw error;
+    }
+  },
+
+  async transferBalance(data: TransferRequest): Promise<WalletResponse> {
+    try {
+      const response = await api.post('/wallet/transfer', data);
+      return response.data;
+    } catch (error) {
+      console.error('Error transferring balance:', error);
+      throw error;
+    }
+  },
+
+  async getStatement(): Promise<StatementResponse> {
+    try {
+      const response = await api.get('/wallet/statement');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching statement:', error);
       throw error;
     }
   }

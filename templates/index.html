@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Wallet Payment</title>
+  <script src="https://js.stripe.com/v3/"></script>
+</head>
+<body>
+  <button id="checkout">Top Up</button>
+  <script>
+    var stripe = Stripe("{{ public_key }}");
+    document.getElementById('checkout').addEventListener('click', function() {
+      fetch('/create-checkout-session', {method: 'POST'})
+        .then(function(response) { return response.json(); })
+        .then(function(session) { return stripe.redirectToCheckout({sessionId: session.id}); })
+        .catch(function(error) { console.error('Error:', error); });
+    });
+  </script>
+</body>
+</html>

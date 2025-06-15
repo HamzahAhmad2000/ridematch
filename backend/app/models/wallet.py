@@ -142,3 +142,58 @@ class Wallet:
             'message': 'Payment successful',
             'transaction_id': str(transaction_result.inserted_id)
         }
+
+    @staticmethod
+    def transfer_balance(from_user_id, to_user_id, amount):
+        """Transfer balance from one wallet to another"""
+        if from_user_id == to_user_id:
+            return {'success': False, 'message': 'Cannot transfer to same user'}
+
+        from_wallet = mongo.db.wallet.find_one({'user_id': from_user_id})
+        to_wallet = mongo.db.wallet.find_one({'user_id': to_user_id})
+
+        if not from_wallet or not to_wallet:
+            return {'success': False, 'message': 'Wallet not found'}
+
+        if from_wallet.get('balance', 0) < amount:
+            return {'success': False, 'message': 'Insufficient balance'}
+
+        # Update balances atomically
+        mongo.db.wallet.update_one({'user_id': from_user_id}, {'$inc': {'balance': -amount}, '$set': {'updated_at': datetime.utcnow()}})
+        mongo.db.wallet.update_one({'user_id': to_user_id}, {'$inc': {'balance': amount}, '$set': {'updated_at': datetime.utcnow()}})
+
+        # Record transactions for both users
+        now = datetime.utcnow()
+        debit = {
+            'user_id': from_user_id,
+            'amount': -amount,
+            'type': 'transfer',
+            'description': f'Transfer to {to_user_id}',
+            'transaction_date': now,
+            'status': 'completed'
+        }
+        credit = {
+            'user_id': to_user_id,
+            'amount': amount,
+            'type': 'transfer',
+            'description': f'Transfer from {from_user_id}',
+            'transaction_date': now,
+            'status': 'completed'
+        }
+        mongo.db.transactions.insert_one(debit)
+        mongo.db.transactions.insert_one(credit)
+
+        return {'success': True, 'message': 'Transfer complete'}
+
+    @staticmethod
+    def get_statement(user_id):
+        """Return transaction history for statement generation"""
+        transactions = list(mongo.db.transactions.find({'user_id': user_id}).sort('transaction_date', -1))
+        return transactions
+
+    @staticmethod
+    def is_low_balance(user_id, threshold=100):
+        wallet = mongo.db.wallet.find_one({'user_id': user_id})
+        if not wallet:
+            return False
+        return wallet.get('balance', 0) < threshold

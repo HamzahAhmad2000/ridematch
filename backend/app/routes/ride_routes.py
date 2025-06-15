@@ -34,6 +34,15 @@ def update_ride_status():
 @jwt_required()
 def update_driver_location():
     return RideController.update_driver_location()
+@ride_bp.route('/complete', methods=['POST'])
+@jwt_required()
+def complete_ride():
+    return RideController.complete_ride()
+
+@ride_bp.route('/<ride_id>/route', methods=['GET'])
+@jwt_required()
+def get_ride_route(ride_id):
+    return RideController.get_ride_route(ride_id)
 
 @ride_bp.route('/<ride_id>', methods=['GET'])
 @jwt_required()

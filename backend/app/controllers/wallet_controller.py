@@ -3,7 +3,7 @@ from flask import jsonify, request
 from flask_jwt_extended import get_jwt_identity
 from ..models.wallet import Wallet
 from ..models.ride import Ride
-from ..schemas.wallet_schema import TopUpSchema, PaymentSchema
+from ..schemas.wallet_schema import TopUpSchema, PaymentSchema, TransferSchema
 from marshmallow import ValidationError
 import logging
 
@@ -110,3 +110,50 @@ class WalletController:
         except Exception as e:
             logger.error(f"Error processing payment: {str(e)}")
             return jsonify({'error': 'Failed to process payment', 'details': str(e)}), 500
+
+    @staticmethod
+    def transfer_balance():
+        try:
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': 'No data provided'}), 400
+
+            schema = TransferSchema()
+            try:
+                validated = schema.load(data)
+            except ValidationError as err:
+                return jsonify({'error': 'Validation error', 'details': err.messages}), 400
+
+            from_user = get_jwt_identity()
+            to_user = validated.get('to_user_id')
+            amount = validated.get('amount')
+
+            result = Wallet.transfer_balance(from_user, to_user, amount)
+            return jsonify(result), 200 if result.get('success') else 400
+
+        except Exception as e:
+            logger.error(f"Error transferring balance: {str(e)}")
+            return jsonify({'error': 'Failed to transfer balance', 'details': str(e)}), 500
+
+    @staticmethod
+    def get_statement():
+        try:
+            user_id = get_jwt_identity()
+            transactions = Wallet.get_statement(user_id)
+            formatted = [
+                {
+                    'id': str(tx.get('_id')),
+                    'amount': tx.get('amount'),
+                    'type': tx.get('type'),
+                    'description': tx.get('description'),
+                    'payment_method': tx.get('payment_method', ''),
+                    'ride_id': tx.get('ride_id', ''),
+                    'timestamp': tx.get('transaction_date').isoformat() if tx.get('transaction_date') else '',
+                    'status': tx.get('status')
+                } for tx in transactions
+            ]
+            low_balance = Wallet.is_low_balance(user_id)
+            return jsonify({'transactions': formatted, 'low_balance': low_balance}), 200
+        except Exception as e:
+            logger.error(f"Error generating statement: {str(e)}")
+            return jsonify({'error': 'Failed to get statement', 'details': str(e)}), 500
