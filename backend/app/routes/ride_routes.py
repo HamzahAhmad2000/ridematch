@@ -30,6 +30,16 @@ def set_arrival_status():
 def update_ride_status():
     return RideController.update_ride_status()
 
+@ride_bp.route('/complete', methods=['POST'])
+@jwt_required()
+def complete_ride():
+    return RideController.complete_ride()
+
+@ride_bp.route('/<ride_id>/route', methods=['GET'])
+@jwt_required()
+def get_ride_route(ride_id):
+    return RideController.get_ride_route(ride_id)
+
 @ride_bp.route('/<ride_id>', methods=['GET'])
 @jwt_required()
 def get_ride_details(ride_id):

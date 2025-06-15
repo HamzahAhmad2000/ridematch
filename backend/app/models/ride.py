@@ -2,6 +2,7 @@
 from .. import mongo
 from bson.objectid import ObjectId
 from datetime import datetime
+from ..utils.geo_utils import GeoUtils
 
 class Ride:
     @staticmethod
@@ -138,3 +139,51 @@ class Ride:
         """Check if a specific user is a passenger on a ride"""
         passenger = mongo.db.ride_passengers.find_one({'ride_id': ride_id, 'user_id': user_id})
         return passenger
+
+    @staticmethod
+    def complete_ride(ride_id):
+        """Mark a ride as completed and move it to ride_history"""
+        if not ObjectId.is_valid(ride_id):
+            return False
+
+        ride = mongo.db.rides.find_one({'_id': ObjectId(ride_id)})
+        if not ride:
+            return False
+
+        completed_at = datetime.utcnow()
+        duration = 0
+        if ride.get('created_at'):
+            duration = (completed_at - ride['created_at']).total_seconds() // 60
+
+        ride_history = ride.copy()
+        ride_history['completed_at'] = completed_at
+        ride_history['duration'] = duration
+        ride_history['status'] = 'completed'
+
+        mongo.db.ride_history.insert_one(ride_history)
+        mongo.db.rides.delete_one({'_id': ObjectId(ride_id)})
+        mongo.db.available_rides.update_one({'ride_id': ride_id}, {'$set': {'active': False}})
+
+        return True
+
+    @staticmethod
+    def get_route_order(ride_id, start_coords):
+        """Return passengers sorted by distance from start_coords"""
+        passengers = list(mongo.db.ride_passengers.find({'ride_id': ride_id}))
+        if not passengers:
+            return []
+
+        remaining = passengers[:]
+        route = []
+        current = start_coords
+
+        while remaining:
+            nearest = min(
+                remaining,
+                key=lambda p: GeoUtils.calculate_distance(current, p['pickup_location'].get('coordinates', {}))
+            )
+            route.append(nearest)
+            current = nearest['pickup_location'].get('coordinates', current)
+            remaining.remove(nearest)
+
+        return route

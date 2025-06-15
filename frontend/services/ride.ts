@@ -68,6 +68,16 @@ export const RideService = {
     const response = await api.post('/rides/status', { ride_id, status });
     return response.data;
   },
+
+  async completeRide(ride_id: string) {
+    const response = await api.post('/rides/complete', { ride_id });
+    return response.data;
+  },
+
+  async getRideRoute(ride_id: string, currentLocation: { latitude: number; longitude: number }) {
+    const response = await api.get(`/rides/${ride_id}/route`, { params: currentLocation });
+    return response.data;
+  },
   
   async getRideDetails(ride_id: string) {
     const response = await api.get(`/rides/${ride_id}`);
