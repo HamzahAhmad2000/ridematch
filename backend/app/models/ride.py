@@ -22,7 +22,8 @@ class Ride:
             'sector': data.get('sector', ''),
             'status': 'created',
             'created_at': datetime.utcnow(),
-            'match_social': data.get('match_social', False)
+            'match_social': data.get('match_social', False),
+            'group_leader_id': None
         }
         
         result = mongo.db.rides.insert_one(ride)
@@ -57,7 +58,7 @@ class Ride:
         return rides
     
     @staticmethod
-    def join_ride(ride_id, user_id, pickup_location, group_join=False, seat_count=1):
+    def join_ride(ride_id, user_id, pickup_location, group_join=False, seat_count=1, is_group_leader=False):
         """Add a passenger to a ride"""
         passenger = {
             'ride_id': ride_id,
@@ -66,6 +67,7 @@ class Ride:
             'has_arrived': False,
             'group_join': group_join,
             'seat_count': seat_count,
+            'is_group_leader': is_group_leader,
             'status': 'awaiting_pickup',
             'joined_at': datetime.utcnow()
         }
@@ -91,6 +93,9 @@ class Ride:
                     {'$set': {'active': False}}
                 )
         
+        if is_group_leader:
+            mongo.db.rides.update_one({'_id': ObjectId(ride_id)}, {'$set': {'group_leader_id': user_id}})
+
         return passenger_id
     
     @staticmethod

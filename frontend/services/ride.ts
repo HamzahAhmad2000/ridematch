@@ -40,6 +40,7 @@ export interface JoinRideForm {
   };
   group_join?: boolean;
   seat_count?: number;
+  is_group_leader?: boolean;
 }
 
 export const RideService = {

@@ -103,3 +103,24 @@ class RideHistoryController:
         except Exception as e:
             logger.error(f"Error rating ride: {str(e)}")
             return jsonify({'error': 'Failed to rate ride', 'details': str(e)}), 500
+    @staticmethod
+    def get_ride_receipt(ride_id):
+        user_id = get_jwt_identity()
+        receipt = RideHistory.get_ride_receipt(ride_id, user_id)
+        if not receipt:
+            return jsonify({'error': 'Ride not found'}), 404
+        return jsonify(receipt), 200
+
+    @staticmethod
+    def reuse_ride(ride_id):
+        user_id = get_jwt_identity()
+        new_id = RideHistory.reuse_ride(ride_id, user_id)
+        if not new_id:
+            return jsonify({'error': 'Ride not found'}), 404
+        return jsonify({'new_ride_id': new_id}), 201
+
+    @staticmethod
+    def get_statistics():
+        user_id = get_jwt_identity()
+        stats = RideHistory.get_statistics(user_id)
+        return jsonify(stats), 200
